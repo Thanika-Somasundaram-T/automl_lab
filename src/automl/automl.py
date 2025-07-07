@@ -38,6 +38,8 @@ class AutoML:
         self._model: nn.Module | None = None
         self._transform = None
         self.best_params = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {self.device}")
 
     def _get_data_loader(self, dataset_class, transform, batch_size, split="train"):
         dataset = dataset_class(
@@ -120,6 +122,7 @@ class AutoML:
 
             # Create model
             model = self._build_model(model_name, dataset_class.num_classes)
+            model.to(self.device)
 
             # Data split
             train_loader, val_loader = self._get_data_loader(dataset_class, self._transform, batch_size, split="train")
@@ -145,6 +148,7 @@ class AutoML:
             for epoch in range(3): 
                 print("Train Epoch: ", epoch)
                 for xb, yb in train_loader:
+                    xb, yb = xb.to(self.device), yb.to(self.device)
                     optimizer.zero_grad()
                     out = model(xb)
                     loss = criterion(out, yb)
@@ -157,6 +161,7 @@ class AutoML:
             correct = total = 0
             with torch.no_grad():
                 for xb, yb in val_loader:
+                    xb, yb = xb.to(self.device), yb.to(self.device)
                     print("Eval ")
                     out = model(xb)
                     preds = out.argmax(dim=1)
@@ -183,6 +188,7 @@ class AutoML:
         print("optimizer: ", best_optimizer)
     
         model = self._build_model(best_model_name, dataset_class.num_classes)
+        model.to(self.device)
         train_loader, _ = self._get_data_loader(dataset_class, self._transform, best_batch_size, split="train")
 
         if best_optimizer == "adam":
@@ -195,6 +201,7 @@ class AutoML:
         for epoch in range(5):
             print("Final train epoch, ", epoch)
             for xb, yb in train_loader:
+                xb, yb = xb.to(self.device), yb.to(self.device)
                 optimizer.zero_grad()
                 out = model(xb)
                 loss = criterion(out, yb)
@@ -213,6 +220,7 @@ class AutoML:
         self._model.eval()
         with torch.no_grad():
             for data, target in data_loader:
+                data = data.to(self.device)
                 output = self._model(data)
                 predicted = torch.argmax(output, 1)
                 labels.append(target.numpy())
