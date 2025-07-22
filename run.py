@@ -7,16 +7,26 @@ to this and you will need to output your predictions for the images of the test 
 to a file, which we will grade using github classrooms!
 """
 from __future__ import annotations
-
+import os
 from pathlib import Path
+
+script_dir = Path(__file__).parent
+import json
+from pathlib import Path
+import neps
 from sklearn.metrics import accuracy_score
 import numpy as np
+import yaml
 from automl.automl import AutoML
 import argparse
 
 import logging
 
 from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
+from neps import run
+from automl.pipeline import BEST_RESULT_PATH, neps_training_wrapper
+from automl.search_space import search_space
+from automl.utils import set_global_seed
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +35,7 @@ def main(
     dataset: str,
     output_path: Path,
     seed: int,
+    use_neps: bool
 ):
     match dataset:
         case "fashion":
@@ -41,10 +52,33 @@ def main(
     # You do not need to follow this setup or API it's merely here to provide
     # an example of how your automl system could be used.
     # As a general rule of thumb, you should **never** pass in any
-    # test data to your AutoML solution other than to generate predictions.
-    automl = AutoML(seed=seed)
+    # test data to your AutoML sol
+    # ution other than to generate predictions.
+    set_global_seed(seed)
+
+    best_params = None
+    if use_neps:
+        with open("./neps.yaml", "r") as f:
+            neps_config = yaml.safe_load(f)
+
+        neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed)
+
+        # # Unpack dictionary directly
+        run(**neps_config)
+        
+    if Path(BEST_RESULT_PATH).exists():
+        with open(BEST_RESULT_PATH) as f:
+            best_params = json.load(f)["config"]
+        print("best config (from saved json):", best_params)
+    else:
+        print("Warning: No best result found. Try to run with --neps to find the best config")
+        exit(0)
+        
     # load the dataset and create a loader then pass it
-    automl.fit(dataset_class)
+    automl = AutoML(seed=seed)
+
+    automl.fit(dataset_class, epochs=1, cfg=best_params)
+
     # Do the same for the test dataset
     test_preds, test_labels = automl.predict(dataset_class)
 
@@ -56,8 +90,6 @@ def main(
         np.save(f, test_preds)
 
     # check if test_labels has missing data
-
-
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
         logger.info(f"Accuracy on test set: {acc}")
@@ -100,6 +132,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether to log only warnings and errors."
     )
+    
+    parser.add_argument(
+        "--neps",
+        action="store_true",
+        help="Use best NEPS config for training instead of Optuna"
+    )
 
     args = parser.parse_args()
 
@@ -117,4 +155,5 @@ if __name__ == "__main__":
         dataset=args.dataset,
         output_path=args.output_path,
         seed=args.seed,
+        use_neps=args.neps
     )
