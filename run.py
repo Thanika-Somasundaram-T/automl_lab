@@ -63,7 +63,6 @@ def main(
 
         neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed)
 
-        # # Unpack dictionary directly
         run(**neps_config)
         plot_neps()
         

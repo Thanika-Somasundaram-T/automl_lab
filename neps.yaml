@@ -1,21 +1,21 @@
 pipeline_space:
   model:
     type: categorical
-    # choices: [resnet18, resnet34, mobilenet_v2, efficientnet_b0]
-    choices: [vit_b_16, deit_tiny, swin_t]
+    choices: [resnet18, resnet34, mobilenet_v2, efficientnet_b0]
+    # choices: [vit_b_16, deit_tiny, swin_t]
 
 
   lr:
     type: float
     log: true
-    lower: 1e-5
-    upper: 1e-2
+    lower: 0.00001    # 1e-5 as decimal
+    upper: 0.01  
 
   weight_decay:
     type: float
     log: true
-    lower: 1e-6
-    upper: 1e-3
+    lower: 0.000001
+    upper: 0.001
 
   optimizer:
     type: categorical
@@ -25,6 +25,6 @@ pipeline_space:
     type: categorical
     choices: [32, 64, 128]
 
-n_init: 8
+optimizer: auto
 max_evaluations_total: 20
 root_directory: "./neps_results"
