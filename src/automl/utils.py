@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import random
 from typing import Any
+import timm
+
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -117,6 +119,15 @@ def build_model(model_name: str, num_classes: int):
         weights = ViT_B_16_Weights.DEFAULT
         model = vit_b_16(weights=weights)
         model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
+
+    elif model_name == "deit_tiny":
+        model = timm.create_model("deit_tiny_patch16_224", pretrained=True)
+        model.head = nn.Linear(model.head.in_features, num_classes)
+
+    elif model_name == "swin_t":
+        model = timm.create_model("swin_tiny_patch4_window7_224", pretrained=True)
+        model.head = nn.Linear(model.head.in_features, num_classes)
+
 
     else:
         raise ValueError(f"Unknown model name: {model_name}")

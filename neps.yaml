@@ -1,7 +1,9 @@
 pipeline_space:
   model:
     type: categorical
-    choices: [resnet18, mobilenet_v2, efficientnet_b0]
+    # choices: [resnet18, resnet34, mobilenet_v2, efficientnet_b0, vit_b_16, deit_tiny, swin_t]
+    choices: [vit_b_16, deit_tiny, swin_t]
+
 
   lr:
     type: float
@@ -23,5 +25,5 @@ pipeline_space:
     type: categorical
     choices: [32, 64, 128]
 
-max_evaluations_total: 3
+max_evaluations_total: 20
 root_directory: "./neps_results"
