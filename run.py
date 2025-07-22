@@ -26,7 +26,7 @@ from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
 from neps import run
 from automl.pipeline import BEST_RESULT_PATH, neps_training_wrapper
 from automl.search_space import search_space
-from automl.utils import set_global_seed
+from automl.utils import plot_neps, set_global_seed
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ def main(
 
         # # Unpack dictionary directly
         run(**neps_config)
+        plot_neps()
         
     if Path(BEST_RESULT_PATH).exists():
         with open(BEST_RESULT_PATH) as f:
@@ -78,8 +79,7 @@ def main(
     automl = AutoML(seed=seed)
 
     automl.fit(dataset_class, epochs=1, cfg=best_params)
-
-    # Do the same for the test dataset
+    
     test_preds, test_labels = automl.predict(dataset_class)
 
     # Write the predictions of X_test to disk

@@ -1,6 +1,9 @@
+import json
+from pathlib import Path
 import random
 from typing import Any
 
+from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -119,4 +122,40 @@ def build_model(model_name: str, num_classes: int):
         raise ValueError(f"Unknown model name: {model_name}")
 
     return model
+
+
+def plot_neps(losses_path="neps_results/losses_log.json"):
+    if not Path(losses_path).exists():
+        print("No loss log found to plot.")
+        return
+
+    with open(losses_path) as f:
+        all_losses = json.load(f)
+
+    plt.figure(figsize=(8,5))
+    for i, losses in enumerate(all_losses["train"]):
+        plt.plot(losses, label=f"Trial {i+1}")
+    plt.title("Train Loss per Epoch (All NEPS Trials)")
+    plt.xlabel("Epoch")
+    plt.ylabel("Train Loss")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("neps_results/train_loss_all_trials.png")
+    plt.close()
+
+    plt.figure(figsize=(8,5))
+    for i, losses in enumerate(all_losses["val"]):
+        plt.plot(losses, label=f"Trial {i+1}")
+    plt.title("Val Loss per Epoch (All NEPS Trials)")
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("neps_results/val_loss_all_trials.png")
+    plt.close()
+
+    print("Plots saved in neps_results/")
+
 

@@ -23,7 +23,9 @@ class AutoML:
         self.seed = seed
         self._model: nn.Module | None = None
         self._transform = None
-        self.best_params = None
+        self.train_losses = []
+        self.val_losses = []
+        self.accuracy = 0
         self.device = get_device()
         print(f"Using device: {self.device}")
 
@@ -53,8 +55,6 @@ class AutoML:
             transforms.ToTensor(),
             transforms.Normalize(*calculate_mean_std(dataset_class)),
         ])
-        
-        # Load full train dataset (no val split)
         train_loader, val_loader = get_data_loader(
             dataset_class=dataset_class,
             transform=self._transform,
@@ -64,13 +64,9 @@ class AutoML:
             seed=self.seed
         )
 
-        # Build model and send to device
         model = build_model(cfg["model"], dataset_class.num_classes)
         model.to(self.device)
-        print("model built")
-        print()
 
-        # Optimizer setup
         if cfg["optimizer"] == "adam":
             optimizer = optim.Adam(model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
         else:
@@ -78,37 +74,71 @@ class AutoML:
 
         criterion = nn.CrossEntropyLoss()
 
-        # Train loop
-        model.train()
+        self.train_losses = []
+        self.val_losses = []
+        best_val_acc = 0.0  # Optional: to track best val accuracy
+
         for epoch in range(epochs):
-            print("Train Epoch: ", epoch)
+            model.train()
+            epoch_loss = 0
+            batch_count = 0
+            print(f"Train Epoch: {epoch}")
+
             for xb, yb in train_loader:
                 xb, yb = xb.to(self.device), yb.to(self.device)
                 optimizer.zero_grad()
                 loss = criterion(model(xb), yb)
                 loss.backward()
                 optimizer.step()
+                epoch_loss += loss.item()
+                batch_count += 1
 
-        self._model = model
-        
-        if is_val:
-            # validate on val_loader and return val accuracy
-            acc = self.validate(val_loader)
-            return acc
+            avg_epoch_loss = epoch_loss / batch_count
+            self.train_losses.append(avg_epoch_loss)
+            print(f"Epoch {epoch} train loss: {avg_epoch_loss:.4f}")
+            if is_val:
+                # Validate after each epoch
+                model.eval()
+                val_loss = 0
+                val_batch_count = 0
+                correct = 0
+                total = 0
+
+                with torch.no_grad():
+                    for xb, yb in val_loader:
+                        xb, yb = xb.to(self.device), yb.to(self.device)
+                        outputs = model(xb)
+                        loss = criterion(outputs, yb)
+                        val_loss += loss.item()
+                        val_batch_count += 1
+
+                        preds = outputs.argmax(dim=1)
+                        correct += (preds == yb).sum().item()
+                        total += yb.size(0)
+
+                avg_val_loss = val_loss / val_batch_count
+                self.val_losses.append(avg_val_loss)
+                val_acc = correct / total
+                print(f"Epoch {epoch} val loss: {avg_val_loss:.4f}, val accuracy: {val_acc:.4f}")
+                
+                if val_acc > best_val_acc:
+                    print("============================= best at this trial so far: ", epoch)
+                    best_val_acc = val_acc
+                    best_model_state = model.state_dict()
+                    self.accuracy = val_acc
+
+        # After training done, save best model if validation was used
+        if is_val and best_model_state is not None:
+            model.load_state_dict(best_model_state)
+            self._model = model
         else:
-            return self
-    
-    def validate(self, val_loader):
-        self._model.eval()
-        correct = total = 0
-        with torch.no_grad():
-            print("validating...")
-            for xb, yb in val_loader:
-                xb, yb = xb.to(self.device), yb.to(self.device)
-                preds = self._model(xb).argmax(dim=1)
-                correct += (preds == yb).sum().item()
-                total += yb.size(0)
-        return correct / total
+            # No validation, just save the last model
+            self._model = model
+            if not is_val:
+                self.accuracy = 0.0  # accuracy unknown without validation
+
+        return self
+
 
     def predict(self, dataset_class) -> Tuple[np.ndarray, np.ndarray]:
         # Prepare data loader for test split
@@ -123,7 +153,7 @@ class AutoML:
                 data = data.to(self.device)
                 output = self._model(data)
                 predicted = torch.argmax(output, dim=1)
-                labels.append(target.numpy())
+                labels.append(target.cpu().numpy())
                 predictions.append(predicted.cpu().numpy())
 
         predictions = np.concatenate(predictions)
