@@ -17,6 +17,12 @@ pipeline_space:
     type: categorical
     choices: [32, 64, 128]
 
+  max_epochs:
+    type: int
+    lower: 5
+    upper: 50
+    is_fidelity: true
+
 optimizer: hyperband
 max_evaluations_total: 20
 root_directory: "./neps_results"
