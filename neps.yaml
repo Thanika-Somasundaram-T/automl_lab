@@ -3,7 +3,7 @@ pipeline_space:
     type: categorical
     choices: [resnet18, resnet34, mobilenet_v2, efficientnet_b0]
 
-  learning_rate:
+  lr:
     type: float
     log: true
     lower: 1e-5

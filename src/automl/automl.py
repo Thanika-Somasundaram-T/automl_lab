@@ -69,8 +69,9 @@ class AutoML:
             seed=self.seed
         )
 
-        model = build_model(config, dataset_class.num_classes)
+        model = build_model(config["model"], dataset_class.num_classes)
         model.to(self.device)
+        
         if config["optimizer"] == "adam":
             optimizer = optim.Adam(model.parameters(), lr=config["lr"])
         else:
