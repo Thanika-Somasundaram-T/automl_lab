@@ -11,7 +11,9 @@ def neps_training_wrapper(dataset_class, seed):
     def evaluate_pipeline(**config):
         try:
             automl = AutoML(seed=seed)
-            automl.fit(dataset_class, epochs=15, cfg=config, is_val=True)
+            epochs = config.get("max_epochs", 15)
+            print("====================", config)
+            automl.fit(dataset_class, config, epochs=epochs, is_val=True)
             train_loss = automl.train_losses
             val_loss = automl.val_losses
             

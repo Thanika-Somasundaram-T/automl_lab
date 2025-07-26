@@ -28,15 +28,8 @@ class AutoML:
         self.accuracy = 0
         self.device = get_device()
         print(f"Using device: {self.device}")
-
-    def fit(
-        self,
-        dataset_class: Any,
-        cfg: dict,
-        epochs: int=5,
-        is_val: bool=False,
-    ) -> AutoML:
         
+    def transform_images(self, dataset_class):
         dataset_name = dataset_class.__name__.lower()
 
         if "flowers" in dataset_name:
@@ -46,7 +39,7 @@ class AutoML:
         elif "fashion" in dataset_name:
             resize_size = 28
         else:
-            resize_size = 64  # fallback
+            resize_size = 128  # fallback
 
         # Resize + convert to 3 channels for pretrained models
         self._transform = transforms.Compose([
@@ -55,22 +48,35 @@ class AutoML:
             transforms.ToTensor(),
             transforms.Normalize(*calculate_mean_std(dataset_class)),
         ])
+
+    def fit(
+        self,
+        dataset_class: Any,
+        config: dict,
+        epochs: int=5,
+        is_val: bool=False,
+    ) -> AutoML:
+        
+        print("??????????????????", config)
+        
+        self.transform_images(dataset_class)
         train_loader, val_loader = get_data_loader(
             dataset_class=dataset_class,
             transform=self._transform,
-            batch_size=cfg["batch_size"],
+            batch_size=config["batch_size"],
             split="train",
             is_val=is_val,
             seed=self.seed
         )
 
-        model = build_model(cfg["model"], dataset_class.num_classes)
+        model = build_model(config, dataset_class.num_classes)
         model.to(self.device)
-
-        if cfg["optimizer"] == "adam":
-            optimizer = optim.Adam(model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
+        if config["optimizer"] == "adam":
+            optimizer = optim.Adam(model.parameters(), lr=config["lr"])
         else:
-            optimizer = optim.SGD(model.parameters(), lr=cfg["lr"], momentum=0.9, weight_decay=cfg["weight_decay"])
+            optimizer = optim.SGD(model.parameters(), lr=config["lr"])
+
+
 
         criterion = nn.CrossEntropyLoss()
 

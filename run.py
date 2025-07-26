@@ -22,7 +22,7 @@ import argparse
 
 import logging
 
-from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
+from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset, SkinCancerDataset
 from neps import run
 from automl.pipeline import BEST_RESULT_PATH, neps_training_wrapper
 from automl.search_space import search_space
@@ -44,6 +44,8 @@ def main(
             dataset_class = FlowersDataset
         case "emotions":
             dataset_class = EmotionsDataset
+        case "skin_cancer":
+            dataset_class = SkinCancerDataset
         case _:
             raise ValueError(f"Invalid dataset: {args.dataset}")
 
@@ -63,7 +65,13 @@ def main(
 
         neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed)
 
-        run(**neps_config)
+        run(
+            optimizer=neps_config["optimizer"],
+            max_evaluations_total=neps_config["max_evaluations_total"],
+            root_directory=neps_config["root_directory"],
+            pipeline_space=neps_config["pipeline_space"],
+            evaluate_pipeline=neps_config["evaluate_pipeline"],
+        )
         plot_neps()
         
     if Path(BEST_RESULT_PATH).exists():
@@ -77,7 +85,7 @@ def main(
     # load the dataset and create a loader then pass it
     automl = AutoML(seed=seed)
 
-    automl.fit(dataset_class, epochs=1, cfg=best_params)
+    automl.fit(dataset_class, epochs=1, config=best_params)
     
     test_preds, test_labels = automl.predict(dataset_class)
 
@@ -106,7 +114,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="The name of the dataset to run on.",
-        choices=["fashion", "flowers", "emotions"]
+        choices=["fashion", "flowers", "emotions", "skin_cancer"]
     )
     parser.add_argument(
         "--output-path",
