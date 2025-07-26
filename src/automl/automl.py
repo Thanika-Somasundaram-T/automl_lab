@@ -75,7 +75,7 @@ class AutoML:
         if config["optimizer"] == "adam":
             optimizer = optim.Adam(model.parameters(), lr=config["lr"])
         else:
-            optimizer = optim.SGD(model.parameters(), lr=config["lr"])
+            optimizer = optim.SGD(model.parameters(), lr=config["lr"], momentum=0.9)
 
 
 
