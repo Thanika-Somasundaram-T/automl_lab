@@ -21,11 +21,13 @@ from automl.automl import AutoML
 import argparse
 
 import logging
+from torch.utils.tensorboard import SummaryWriter
+import time
+
 
 from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset, SkinCancerDataset
 from neps import run
 from automl.pipeline import BEST_RESULT_PATH, neps_training_wrapper
-from automl.search_space import search_space
 from automl.utils import plot_neps, set_global_seed
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,7 @@ def main(
             neps_config = yaml.safe_load(f)
 
         neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed)
+        
 
         run(
             optimizer=neps_config["optimizer"],
@@ -72,7 +75,6 @@ def main(
             pipeline_space=neps_config["pipeline_space"],
             evaluate_pipeline=neps_config["evaluate_pipeline"],
         )
-        plot_neps()
         
     if Path(BEST_RESULT_PATH).exists():
         with open(BEST_RESULT_PATH) as f:
@@ -82,27 +84,33 @@ def main(
         print("Warning: No best result found. Try to run with --neps to find the best config")
         exit(0)
         
-    # load the dataset and create a loader then pass it
-    automl = AutoML(seed=seed)
-
-    automl.fit(dataset_class, epochs=1, config=best_params)
+    # # load the dataset and create a loader then pass it
+    # automl = AutoML(seed=seed)
     
-    test_preds, test_labels = automl.predict(dataset_class)
+    # test_preds, test_labels = automl.predict(dataset_class)
 
-    # Write the predictions of X_test to disk
-    # This will be used by github classrooms to get a performance
-    # on the test set.
-    logger.info("Writing predictions to disk")
-    with output_path.open("wb") as f:
-        np.save(f, test_preds)
+    # # Write the predictions of X_test to disk
+    # # This will be used by github classrooms to get a performance
+    # # on the test set.
+    # logger.info("Writing predictions to disk")
+    # with output_path.open("wb") as f:
+    #     np.save(f, test_preds)
+    
+    # In case of running on the test data, also add the predictions.npy
+    # to the correct location for autoevaluation.
+    # if dataset=="skin_cancer":
+    #     test_output_path = Path("data/exam_dataset/predictions.npy")
+    #     test_output_path.parent.mkdir(parents=True, exist_ok=True)
+    #     with test_output_path.open("wb") as f:
+    #         np.save(f, test_preds)
 
-    # check if test_labels has missing data
-    if not np.isnan(test_labels).any():
-        acc = accuracy_score(test_labels, test_preds)
-        logger.info(f"Accuracy on test set: {acc}")
-    else:
-        # This is the setting for the exam dataset, you will not have access to the labels
-        logger.info(f"No test split for dataset '{dataset}'")
+    # # check if test_labels has missing data
+    # if not np.isnan(test_labels).any():
+    #     acc = accuracy_score(test_labels, test_preds)
+    #     logger.info(f"Accuracy on test set: {acc}")
+    # else:
+    #     # This is the setting for the exam dataset, you will not have access to the labels
+    #     logger.info(f"No test split for dataset '{dataset}'")
 
 
 

@@ -1,60 +1,53 @@
-
 import json
+import time
 from pathlib import Path
 from automl.automl import AutoML
+from automl.train import train_and_validate
+from automl.utils import set_global_seed
 
-BEST_RESULT_PATH = "neps_results/best_result.json"
-LOSSES_LOG_PATH = Path("neps_results/losses_log.json")
-
+BEST_RESULT_PATH = "./results/neps_best_result.json"
 
 def neps_training_wrapper(dataset_class, seed):
     def evaluate_pipeline(**config):
-        try:
-            automl = AutoML(seed=seed)
-            epochs = config.get("max_epochs", 15)
-            print("====================", config)
-            automl.fit(dataset_class, config, epochs=epochs, is_val=True)
-            train_loss = automl.train_losses
-            val_loss = automl.val_losses
-            
-            val_error = 1 - automl.accuracy
+        set_global_seed(seed)
 
-            print("Ended: ", val_error, "Val_acc: ", automl.accuracy)
+        start_time = time.time()
 
-            # Save best result
-            if not Path(BEST_RESULT_PATH).exists():
-                current_best = {"val_error": 1.0}
-            else:
-                with open(BEST_RESULT_PATH) as f:
-                    current_best = json.load(f)
+        # Train and validate
+        val_acc = train_and_validate(config, dataset_class=dataset_class, seed=seed)
+        elapsed_time = time.time() - start_time
 
-            if val_error < current_best["val_error"]:
-                with open(BEST_RESULT_PATH, "w") as f:
-                    json.dump({"val_error": val_error, "val_acc": automl.accuracy, "config": config}, f, indent=2)
-                    
-            LOSSES_LOG_PATH.parent.mkdir(exist_ok=True)
-            if LOSSES_LOG_PATH.exists():
-                with open(LOSSES_LOG_PATH) as f:
-                    all_losses = json.load(f)
-            else:
-                all_losses = {"train": [], "val": []}
+        # Load best accuracy so far (from file)
+        best_acc = -1.0
+        if Path(BEST_RESULT_PATH).exists():
+            try:
+                with open(BEST_RESULT_PATH, "r") as f:
+                    best_acc = json.load(f).get("val_acc", -1.0)
+            except Exception as e:
+                print(f"[NEPS] Warning: Could not load best result file: {e}")
 
-            all_losses["train"].append(train_loss)
-            all_losses["val"].append(val_loss)
+        # Save if this is the new best
+        if val_acc > best_acc:
+            Path(BEST_RESULT_PATH).parent.mkdir(parents=True, exist_ok=True)
+            with open(BEST_RESULT_PATH, "w") as f:
+                json.dump({"config": config, "val_acc": val_acc}, f)
+            print(f"[NEPS] New best model! val_acc={val_acc:.4f} (improved from {best_acc:.4f})")
 
-            with open(LOSSES_LOG_PATH, "w") as f:
-                json.dump(all_losses, f, indent=2)
-
-            return {
-                "objective_to_minimize": val_error,
-                "cost": 0,
-                "info_dict": {"val_acc": automl.accuracy}
+        return {
+            "objective_to_minimize": 1 - val_acc,
+            "cost": elapsed_time,
+            "info_dict": {
+                "val_acc": val_acc,
+                "training_time": elapsed_time,
+                "training_time_min": elapsed_time / 60,
+                "training_time_hr": elapsed_time / 3600,
+                "model": config.get("model"),
+                "unfreeze_layers": config.get("unfreeze_layers"),
+                "batch_size": config.get("batch_size"),
+                "optimizer": config.get("optimizer"),
+                "lr": config.get("lr"),
+                "max_epochs": config.get("max_epochs"),
             }
-        except Exception as e:
-            print(f"##################################Error in config {config}: {e}")
-            return {
-                "objective_to_minimize": 1.0,  # Worst possible loss
-                "cost": 0,
-                "info_dict": {"val_acc": 0.0}
-            }
+        }
+
     return evaluate_pipeline

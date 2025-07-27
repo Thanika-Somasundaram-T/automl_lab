@@ -1,7 +1,7 @@
 pipeline_space:
   model:
     type: categorical
-    choices: [resnet18, resnet34, mobilenet_v2, efficientnet_b0]
+    choices: ["resnet50", "efficientnet_b0", "convnext_tiny", "swin_tiny"]
 
   lr:
     type: float
@@ -15,14 +15,21 @@ pipeline_space:
 
   batch_size:
     type: categorical
-    choices: [32, 64, 128]
+    choices: [32, 64]
 
   max_epochs:
     type: int
-    lower: 5
-    upper: 50
+    lower: 2
+    upper: 15
     is_fidelity: true
+  
+  unfreeze_layers:
+    type: int
+    lower: 1
+    upper: 3
 
 optimizer: hyperband
 max_evaluations_total: 50
 root_directory: "./neps_results"
+
+
