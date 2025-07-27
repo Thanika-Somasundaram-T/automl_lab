@@ -294,14 +294,12 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
         if hasattr(model, "head"):
             for p in model.head.parameters():
                 p.requires_grad = True
-        elif model_name.startswith("swin"):
-            # For Swin Transformer, layers are stored in 'model._modules['layers']'
-            layers = []
-            for i, stage in enumerate(model._modules['layers']):
-                # Each stage is indexed, and we append the blocks in the stage to the layers list
-                layers.extend(model._modules['layers'][i].blocks)
-            
-
+    elif model_name.startswith("swin"):
+        # For Swin Transformer, layers are stored in 'model._modules['layers']'
+        layers = []
+        for i, stage in enumerate(model._modules['layers']):
+            # Each stage is indexed, and we append the blocks in the stage to the layers list
+            layers.extend(model._modules['layers'][i].blocks)
     else:
         raise ValueError(f"Unfreezing not supported for model {model_name}")
 
