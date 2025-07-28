@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from automl.pipeline import neps_training_wrapper
+
 script_dir = Path(__file__).parent
 import json
 from pathlib import Path
@@ -27,7 +29,6 @@ import time
 
 from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset, SkinCancerDataset
 from neps import run
-from automl.pipeline import BEST_RESULT_PATH, neps_training_wrapper
 from automl.utils import plot_neps, set_global_seed
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 def main(
     dataset: str,
     output_path: Path,
+    neps_dir: Path,
     seed: int,
     use_neps: bool
 ):
@@ -65,17 +67,18 @@ def main(
         with open("./neps.yaml", "r") as f:
             neps_config = yaml.safe_load(f)
 
-        neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed)
+        neps_config["evaluate_pipeline"] = neps_training_wrapper(dataset_class, seed, neps_dir=neps_dir)
         
 
         run(
             optimizer=neps_config["optimizer"],
             max_evaluations_total=neps_config["max_evaluations_total"],
-            root_directory=neps_config["root_directory"],
+            root_directory=neps_dir,
             pipeline_space=neps_config["pipeline_space"],
             evaluate_pipeline=neps_config["evaluate_pipeline"],
         )
-        
+    
+    BEST_RESULT_PATH = neps_dir / "neps_best_result.json"
     if Path(BEST_RESULT_PATH).exists():
         with open(BEST_RESULT_PATH) as f:
             best_params = json.load(f)["config"]
@@ -151,7 +154,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--neps",
         action="store_true",
-        help="Use best NEPS config for training instead of Optuna"
+        help="Whether to use NEPS or not."
+    )
+    
+    parser.add_argument(
+        "--neps_dir",
+        type=Path,
+        default=Path("neps_results"),
+        help=(
+            "The path to save the neps_results to. "
+            "By default this will save to './neps_results'."
+        )
     )
 
     args = parser.parse_args()
@@ -170,5 +183,6 @@ if __name__ == "__main__":
         dataset=args.dataset,
         output_path=args.output_path,
         seed=args.seed,
-        use_neps=args.neps
+        use_neps=args.neps,
+        neps_dir=args.neps_dir
     )

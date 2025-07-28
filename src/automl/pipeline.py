@@ -5,9 +5,8 @@ from automl.automl import AutoML
 from automl.train import train_and_validate
 from automl.utils import set_global_seed
 
-BEST_RESULT_PATH = "./results/neps_best_result.json"
-
-def neps_training_wrapper(dataset_class, seed):
+def neps_training_wrapper(dataset_class, seed, neps_dir=Path):
+    BEST_RESULT_PATH = neps_dir / "neps_best_result.json"
     def evaluate_pipeline(**config):
         set_global_seed(seed)
 

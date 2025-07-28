@@ -16,7 +16,9 @@ from torchvision.models import (
     resnet34, ResNet34_Weights,
     mobilenet_v2, MobileNet_V2_Weights,
     efficientnet_b0, EfficientNet_B0_Weights,
-    vit_b_16, ViT_B_16_Weights
+    vit_b_16, ViT_B_16_Weights,
+    mobilenet_v3_large, MobileNet_V3_Large_Weights,
+    efficientnet_b3, EfficientNet_B3_Weights
 )
 
 
@@ -262,6 +264,16 @@ def get_model(model_name: str, num_classes: int) -> nn.Module:
 
         num_classes = 10
         model.head = SwinClassifierHead(model.head.fc.in_features, num_classes)
+    
+    elif model_name == 'efficientnet_b3':
+        weights = EfficientNet_B3_Weights.DEFAULT
+        model = models.efficientnet_b3(weights=weights)
+        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
+
+    elif model_name == 'mobilenet_v3_large':
+        weights = MobileNet_V3_Large_Weights.DEFAULT
+        model = models.mobilenet_v3_large(weights=weights)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
     else:
         raise ValueError(f"Model {model_name} is not supported.")
         
@@ -300,6 +312,11 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
         for i, stage in enumerate(model._modules['layers']):
             # Each stage is indexed, and we append the blocks in the stage to the layers list
             layers.extend(model._modules['layers'][i].blocks)
+            
+    elif model_name.startswith("mobilenet"):
+        layers = list(model.features.children())
+        for p in model.classifier.parameters():
+            p.requires_grad = True
     else:
         raise ValueError(f"Unfreezing not supported for model {model_name}")
 
@@ -329,3 +346,32 @@ def transform_images(dataset_class):
         return 224
     else:
         return 128
+    
+    
+def plot_confusion_matrix(cm, class_names):
+    """
+    Returns a matplotlib figure containing the plotted confusion matrix.
+    """
+    figure = plt.figure(figsize=(8, 8))
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix")
+    plt.colorbar()
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names, rotation=45)
+    plt.yticks(tick_marks, class_names)
+
+    # Normalize the confusion matrix.
+    cm_norm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis] + 1e-6)
+
+    # Use white text if squares are dark; otherwise black.
+    threshold = cm_norm.max() / 2.
+
+    for i, j in np.ndindex(cm.shape):
+        color = "white" if cm_norm[i, j] > threshold else "black"
+        plt.text(j, i, f"{cm[i, j]}\n({cm_norm[i, j]*100:.1f}%)",
+                 horizontalalignment="center", color=color)
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    return figure

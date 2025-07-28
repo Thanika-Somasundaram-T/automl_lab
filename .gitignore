@@ -164,5 +164,7 @@ cython_debug/
 
 data/
 
-neps_results/
+neps_results*
 runs/
+results/
+**/tensor_logs*/
