@@ -1,7 +1,7 @@
 pipeline_space:
   model:
     type: categorical
-    choices: ["resnet50", "efficientnet_b0", "efficientnet_b3", "mobilenet_v3_large"]
+    choices: ["resnet50", "efficientnet_b0", "mobilenet_v3_large", "convnext_tiny", "swin_tiny"]
 
 
   lr:
@@ -21,15 +21,15 @@ pipeline_space:
   max_epochs:
     type: int
     lower: 2
-    upper: 50
+    upper: 30
     is_fidelity: true
   
   unfreeze_layers:
     type: int
-    lower: 1
+    lower: 0
     upper: 4
 
 optimizer: hyperband
-max_evaluations_total: 50
+max_evaluations_total: 60
 
 
