@@ -38,6 +38,8 @@ def train_and_validate(
 
     set_global_seed(seed)
     device = get_device()
+    
+    print("taken device, ", device)
 
     # Calculate mean and std for normalization
     mean, std = calculate_mean_std(dataset_class)
@@ -55,7 +57,7 @@ def train_and_validate(
 
     val_transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=3),
-        transforms.Resize(244),
+        transforms.Resize(224),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
@@ -78,14 +80,20 @@ def train_and_validate(
     num_classes = dataset_class.num_classes
 
     # Create model and move to device
-    model = get_model(config["model"], num_classes=num_classes)
+    # Optimizer
+    model = get_model(
+    model_name=config["model"], 
+    num_classes=num_classes, 
+    hidden_dim=config["hidden_dim"], 
+    dropout=config["dropout"], 
+    layers=config["head_layers"]
+    )
+    
     model.to(device)
 
-    # Freeze/unfreeze layers as per config
-    unfreeze_last_k_layers(model, config["model"], config["unfreeze_layers"])
+    # No freezing/unfreezing - train all parameters
+    params_to_optimize = model.parameters()
 
-    # Optimizer
-    params_to_optimize = filter(lambda p: p.requires_grad, model.parameters())
     if config["optimizer"] == "adam":
         optimizer = optim.Adam(params_to_optimize, lr=config["lr"])
     elif config["optimizer"] == "sgd":
@@ -95,14 +103,14 @@ def train_and_validate(
     
     dataset_name = dataset_class.__name__
     model_folder = config["model"]
-    freeze_folder = f"unfreeze{config['unfreeze_layers']}"
-    trial_name = f"{config['model']}_lr{config['lr']:.5f}_bs{config['batch_size']}"
+    freeze_folder = f"head_layers{config['head_layers']}"
+    trial_name = f"{config['model']}_lr{config['lr']:.5f}_bs{config['batch_size']}_epoch{config['max_epochs']}"
     log_dir = os.path.join("tensor_logs", dataset_name, model_folder, freeze_folder, trial_name)
     writer = SummaryWriter(log_dir=log_dir)
 
     
     criterion = nn.CrossEntropyLoss()
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+    # scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
 
 
     best_val_acc = 0.0
@@ -120,7 +128,6 @@ def train_and_validate(
 
             optimizer.zero_grad()
             outputs = model(inputs)
-
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -176,9 +183,8 @@ def train_and_validate(
         writer.add_scalar("Recall/Val", recall, epoch)
         writer.add_scalar("F1/Val", f1, epoch)
         
-        scheduler.step()
-        current_lr = scheduler.get_last_lr()[0]
-        writer.add_scalar("LearningRate", current_lr, epoch)
+        # scheduler.step()
+        # current_lr = scheduler.get_last_lr()[0]
         fig = plot_confusion_matrix(cm, list(range(num_classes)))
         writer.add_figure("Confusion_Matrix", fig, epoch)
 
@@ -195,6 +201,9 @@ def train_and_validate(
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            
+    writer.add_scalar("LearningRate", config['lr'], config["max_epochs"])
+    
     
     writer.close()
     return best_val_acc

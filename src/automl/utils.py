@@ -18,7 +18,8 @@ from torchvision.models import (
     efficientnet_b0, EfficientNet_B0_Weights,
     vit_b_16, ViT_B_16_Weights,
     mobilenet_v3_large, MobileNet_V3_Large_Weights,
-    efficientnet_b3, EfficientNet_B3_Weights
+    efficientnet_b3, EfficientNet_B3_Weights,
+    resnext50_32x4d, ResNeXt50_32X4D_Weights,
 )
 
 
@@ -91,8 +92,7 @@ def get_data_loader(
 
         if is_val:
             # Calculate split sizes
-            train_size = int(0.8 * len(full_dataset))
-            val_size = len(full_dataset) - train_size
+            train_size = int(0.7 * len(full_dataset))
 
             # Generate indices for train and val splits
             generator = torch.Generator().manual_seed(seed)
@@ -229,8 +229,39 @@ def plot_neps(losses_path="neps_results/losses_log.json"):
 import torch
 import torch.nn as nn
 from torchvision import models
+class SwinClassifierHead(nn.Module):
+    def __init__(self, in_features, num_classes, hidden_dim=512, dropout=0.5, layers=2):
+        super().__init__()
+        # MLP head as before, can reuse your make_mlp_head function or define inline
+        self.mlp_head = make_mlp_head(in_features, num_classes, hidden_dim, dropout, layers)
+    
+    def forward(self, x):
+        # x shape: [B, H, W, C] e.g. [42, 7, 7, 7]
+        B, H, W, C = x.shape
+        x = x.view(B, H * W, C)       # flatten spatial tokens
+        x = x.mean(dim=1)             # global average pooling over tokens → [B, C]
+        x = self.mlp_head(x)          # [B, num_classes]
+        return x
 
-def get_model(model_name: str, num_classes: int) -> nn.Module:
+def make_mlp_head(in_features: int, num_classes: int, hidden_dim: int = 512, dropout: float = 0.5, layers: int = 2) -> nn.Sequential:
+    """
+    Creates an MLP head with `layers` layers, each having `hidden_dim` neurons,
+    ReLU activations, dropout, and final classification layer.
+    """
+    layers_list = []
+    current_in = in_features
+
+    for i in range(layers - 1):
+        layers_list.append(nn.Linear(current_in, hidden_dim))
+        layers_list.append(nn.ReLU(inplace=True))
+        layers_list.append(nn.Dropout(dropout))
+        current_in = hidden_dim
+
+    # Final output layer
+    layers_list.append(nn.Linear(current_in, num_classes))
+    return nn.Sequential(*layers_list)
+
+def get_model_old(model_name: str, num_classes: int) -> nn.Module:
     if model_name == 'resnet50':
         weights = ResNet50_Weights.DEFAULT  # Using default weights for resnet50
         model = models.resnet50(weights=weights)
@@ -279,6 +310,47 @@ def get_model(model_name: str, num_classes: int) -> nn.Module:
         
     return model
 
+def get_model(model_name: str, num_classes: int, hidden_dim: int = 512, dropout: float = 0.5, layers: int = 2) -> nn.Module:
+    """
+    Loads a pretrained model and replaces its classifier/head with a custom MLP head.
+    Supports CNNs and transformers.
+    """
+    if model_name == 'resnet50':
+        weights = models.ResNet50_Weights.DEFAULT
+        model = models.resnet50(weights=weights)
+        model.fc = make_mlp_head(model.fc.in_features, num_classes, hidden_dim, dropout, layers)
+
+    elif model_name == 'resnext50_32x4d':
+        weights = models.ResNeXt50_32X4D_Weights.DEFAULT
+        model = models.resnext50_32x4d(weights=weights)
+        model.fc = make_mlp_head(model.fc.in_features, num_classes, hidden_dim, dropout, layers)
+
+    elif model_name == 'efficientnet_v2_s':
+        model = timm.create_model("tf_efficientnetv2_s", pretrained=True)
+        model.classifier = make_mlp_head(model.classifier.in_features, num_classes, hidden_dim, dropout, layers)
+
+    elif model_name == 'swin_tiny':
+        model = timm.create_model("swin_tiny_patch4_window7_224", pretrained=True)
+        in_features = model.head.in_features
+        model.head = SwinClassifierHead(in_features, num_classes, hidden_dim, dropout, layers)
+        
+    else:
+        raise ValueError(f"Model {model_name} is not supported.")
+
+    # Freeze backbone
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Unfreeze only the new head
+    for name, module in model.named_children():
+        if any(key in name for key in ["fc", "classifier", "head"]):
+            for p in module.parameters():
+                p.requires_grad = True
+            
+    print("Added ", layers, "to ", model_name)
+    return model
+
+
 def unfreeze_last_k_layers(model, model_name: str, k: int):
     """
     Unfreeze the last `k` high-level blocks/layers of the model.
@@ -312,6 +384,12 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
         for i, stage in enumerate(model._modules['layers']):
             # Each stage is indexed, and we append the blocks in the stage to the layers list
             layers.extend(model._modules['layers'][i].blocks)
+        if hasattr(model, "head"):
+            for p in model.head.parameters():
+                p.requires_grad = True
+        if hasattr(model, "norm"):
+            for p in model.norm.parameters():
+                p.requires_grad = True
             
     elif model_name.startswith("mobilenet"):
         layers = list(model.features.children())
@@ -321,6 +399,7 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
         raise ValueError(f"Unfreezing not supported for model {model_name}")
 
     total_layers = len(layers)
+    # Step 4: Unfreeze last k blocks
     if k > total_layers:
         print(f"Warning: Model has only {total_layers} layers. Unfreezing all available layers.")
         k = total_layers  # Limit k to available layers
@@ -329,8 +408,13 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
         for layer in layers[-k:]:
             for param in layer.parameters():
                 param.requires_grad = True
-    
-    print(f"Unfroze {k} layers for model {model_name}")
+        print(f"Unfroze {k} layers for model {model_name}")
+        
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
+    if not trainable_params:
+        raise ValueError(f"No trainable parameters found for model {model_name} with k={k}.")
+
+    return trainable_params
 
 
 
