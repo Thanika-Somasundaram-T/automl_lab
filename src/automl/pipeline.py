@@ -41,10 +41,12 @@ def neps_training_wrapper(dataset_class, seed, neps_dir=Path):
                 "training_time_min": elapsed_time / 60,
                 "training_time_hr": elapsed_time / 3600,
                 "model": config.get("model"),
-                "unfreeze_layers": config.get("unfreeze_layers"),
+                "head_layers": config.get("head_layers"),
                 "batch_size": config.get("batch_size"),
                 "optimizer": config.get("optimizer"),
                 "lr": config.get("lr"),
+                "hidden_dim": config.get("hidden_dim"),
+                "dropout": config.get("dropout"),
                 "max_epochs": config.get("max_epochs"),
             }
         }
