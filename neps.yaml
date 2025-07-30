@@ -45,6 +45,12 @@ pipeline_space:
     lower: 1
     upper: 3
     prior: 2
+  
+  unfreeze_layers:
+    type: int
+    lower: 0
+    upper: 2
+    prior: 2
 
 
 optimizer: priorband

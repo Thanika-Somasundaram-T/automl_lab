@@ -92,7 +92,7 @@ def get_data_loader(
 
         if is_val:
             # Calculate split sizes
-            train_size = int(0.7 * len(full_dataset))
+            train_size = int(0.8 * len(full_dataset))
 
             # Generate indices for train and val splits
             generator = torch.Generator().manual_seed(seed)
@@ -459,3 +459,24 @@ def plot_confusion_matrix(cm, class_names):
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     return figure
+
+
+def print_class_distribution(dataset):
+    """
+    Prints class distribution for a dataset or Subset.
+    Works with datasets having .targets or .labels.
+    """
+    if isinstance(dataset, Subset):
+        labels = torch.tensor(dataset.dataset.targets)[dataset.indices]
+    elif hasattr(dataset, 'targets'):
+        labels = dataset.targets
+    elif hasattr(dataset, 'labels'):
+        labels = dataset.labels
+    else:
+        raise AttributeError("Dataset does not have 'targets' or 'labels' attribute")
+
+    counts = Counter(labels.tolist())
+    print("\nClass distribution:")
+    for cls_idx, count in sorted(counts.items()):
+        print(f"Class {cls_idx}: {count} samples")
+    return counts

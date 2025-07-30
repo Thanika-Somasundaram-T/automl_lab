@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from sklearn.utils import compute_class_weight
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,9 +10,28 @@ from torchvision import transforms
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import StepLR
+from collections import Counter
 
 from automl.utils import calculate_mean_std, get_data_loader, get_device, get_model, plot_confusion_matrix, set_global_seed, transform_images, unfreeze_last_k_layers
 import os
+
+def print_class_balance(dataset):
+    labels = [label for _, label in dataset]
+    count = Counter(labels)
+    total = sum(count.values())
+    print("Class distribution:")
+    for cls, c in count.items():
+        print(f"  Class {cls}: {c} samples, {c/total:.2%} of dataset")
+
+def get_class_weights(train_dataset):
+    # Assuming train_dataset returns (image, label)
+    labels = [label for _, label in train_dataset]
+    classes = np.unique(labels)
+    class_weights = compute_class_weight('balanced', classes=classes, y=labels)
+    # print("Computed class weights (to be used in loss):")
+    # for i, w in enumerate(class_weights):
+    #     print(f"  Class {i}: weight={w:.4f}")
+    return torch.tensor(class_weights, dtype=torch.float)
 
 def train_and_validate(
     config: dict,
@@ -92,7 +112,7 @@ def train_and_validate(
     model.to(device)
 
     # No freezing/unfreezing - train all parameters
-    params_to_optimize = model.parameters()
+    params_to_optimize = unfreeze_last_k_layers(model, config["model"], config["unfreeze_layers"])
 
     if config["optimizer"] == "adam":
         optimizer = optim.Adam(params_to_optimize, lr=config["lr"])
@@ -107,9 +127,14 @@ def train_and_validate(
     trial_name = f"{config['model']}_lr{config['lr']:.5f}_bs{config['batch_size']}_epoch{config['max_epochs']}"
     log_dir = os.path.join("tensor_logs", dataset_name, model_folder, freeze_folder, trial_name)
     writer = SummaryWriter(log_dir=log_dir)
-
     
-    criterion = nn.CrossEntropyLoss()
+    # print("Before applying class weights:")
+    # print_class_balance(train_loader.dataset)
+
+    class_weights = get_class_weights(train_loader.dataset).to(device)  # make sure to send to correct device
+
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+    
     # scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
 
 

@@ -42,6 +42,7 @@ def neps_training_wrapper(dataset_class, seed, neps_dir=Path):
                 "training_time_hr": elapsed_time / 3600,
                 "model": config.get("model"),
                 "head_layers": config.get("head_layers"),
+                "unfreeze_layers": config.get("unfree_layers"),
                 "batch_size": config.get("batch_size"),
                 "optimizer": config.get("optimizer"),
                 "lr": config.get("lr"),
