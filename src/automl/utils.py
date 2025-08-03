@@ -261,54 +261,6 @@ def make_mlp_head(in_features: int, num_classes: int, hidden_dim: int = 512, dro
     layers_list.append(nn.Linear(current_in, num_classes))
     return nn.Sequential(*layers_list)
 
-def get_model_old(model_name: str, num_classes: int) -> nn.Module:
-    if model_name == 'resnet50':
-        weights = ResNet50_Weights.DEFAULT  # Using default weights for resnet50
-        model = models.resnet50(weights=weights)
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
-
-    elif model_name == 'efficientnet_b0':
-        weights = EfficientNet_B0_Weights.DEFAULT
-        model = models.efficientnet_b0(weights=weights)
-        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-
-    elif model_name == 'convnext_tiny':
-        model = timm.create_model("convnext_tiny", pretrained=True)
-        model.head.fc = nn.Linear(model.head.fc.in_features, num_classes)
-
-    elif model_name == 'swin_tiny':
-        model = timm.create_model("swin_tiny_patch4_window7_224", pretrained=True)
-
-        # ---- 3. Correctly replace the head ----
-        class SwinClassifierHead(nn.Module):
-            def __init__(self, in_features, num_classes):
-                super().__init__()
-                self.fc = nn.Linear(in_features, num_classes)
-
-            def forward(self, x):
-                # x is [B, H, W, C] → flatten to [B, N, C]
-                B, H, W, C = x.shape
-                x = x.view(B, H * W, C)   # flatten spatial dimensions
-                x = x.mean(dim=1)         # global average over tokens
-                x = self.fc(x)            # [B, num_classes]
-                return x
-
-        num_classes = 10
-        model.head = SwinClassifierHead(model.head.fc.in_features, num_classes)
-    
-    elif model_name == 'efficientnet_b3':
-        weights = EfficientNet_B3_Weights.DEFAULT
-        model = models.efficientnet_b3(weights=weights)
-        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-
-    elif model_name == 'mobilenet_v3_large':
-        weights = MobileNet_V3_Large_Weights.DEFAULT
-        model = models.mobilenet_v3_large(weights=weights)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    else:
-        raise ValueError(f"Model {model_name} is not supported.")
-        
-    return model
 
 def get_model(model_name: str, num_classes: int, hidden_dim: int = 512, dropout: float = 0.5, layers: int = 2) -> nn.Module:
     """
@@ -366,8 +318,12 @@ def unfreeze_last_k_layers(model, model_name: str, k: int):
             for p in model.fc.parameters():
                 p.requires_grad = True
 
-    elif model_name.startswith("efficientnet"):
-        layers = list(model.features.children())
+    elif model_name == "efficientnet_v2_s":
+        if hasattr(model, "blocks"):
+            layers = list(model.blocks.children())
+        else:
+            raise ValueError(f"EfficientNet model '{model_name}' from timm does not have attribute 'blocks'.")
+        
         if hasattr(model, "classifier"):
             for p in model.classifier.parameters():
                 p.requires_grad = True
