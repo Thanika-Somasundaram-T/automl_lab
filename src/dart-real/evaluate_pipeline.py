@@ -1,0 +1,68 @@
+import json
+import time
+from pathlib import Path
+
+import torch
+from automl.automl import AutoML
+from automl.train import train_and_validate
+from automl.utils import set_global_seed
+from . import fit
+
+def neps_training_wrapper(loaders, seed, neps_dir=Path):
+    BEST_RESULT_PATH = neps_dir / "neps_best_result.json"
+    def evaluate_pipeline(**config):
+        
+        set_global_seed(seed)
+
+        start_time = time.time()
+           
+        result = fit.fit(config, loaders=loaders, seed=seed)
+        
+        elapsed_time = time.time() - start_time
+        
+        val_acc = result["val_acc"]
+
+        # Path for saving best results
+        best_result_path = neps_dir / "neps_best_result.json"
+        best_model_path = neps_dir / "best_model.pth"
+        best_config_path = neps_dir / "best_config.json"
+        
+        if best_result_path.exists():
+            with open(best_result_path, "r") as f:
+                best_data = json.load(f)
+        else:
+            best_data = {"val_acc": 0}
+
+        # Update best if improved
+        if val_acc > best_data.get("val_acc", 0):
+            best_data = {
+                "val_acc": val_acc,
+                "training_time": elapsed_time,
+                "config": config
+            }
+            print("NEW BEST CONFIG FOUND WITH NEW ACC: ", val_acc, "OLD ACC: ", best_data.get("val_acc", 0))
+            print()
+            print(best_data)
+            print("*******************************************")
+            # Save best model state dict
+            torch.save(result["best_model_state"], best_model_path)
+            # Save best config json
+            with open(best_config_path, "w") as f:
+                json.dump(config, f, indent=2)
+            # Save best result json
+            with open(best_result_path, "w") as f:
+                json.dump(best_data, f, indent=2)
+
+        return {
+            "objective_to_minimize": result["val_acc"],
+            "cost": elapsed_time,
+            "info_dict": {
+                "val_acc": result["val_acc"],
+                "training_time": elapsed_time,
+                "training_time_min": elapsed_time / 60,
+                "training_time_hr": elapsed_time / 3600,
+                "max_epochs": config.get("max_epochs"),
+            }
+        }
+
+    return evaluate_pipeline
