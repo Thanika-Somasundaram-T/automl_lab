@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import mup
+
 from torch.utils.data import DataLoader
 import numpy as np
 import time

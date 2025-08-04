@@ -5,7 +5,6 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import mup
 from torch.utils.data import DataLoader
 import numpy as np
 import time
@@ -279,9 +278,6 @@ def fit2(config, loaders, trial_name, pretrained_path, seed=42):
         model_state.update(filtered_state)
         model.load_state_dict(model_state)
         print("Pretrained weights loaded successfully.")
-
-    mup.set_base_shapes(model, base_model)
-    del base_model
 
     optimizer_w, optimizer_alpha = get_optimizer(model, lr_w, lr_alpha, weight_decay)
 
