@@ -21,8 +21,8 @@ pipeline_space:
 
   max_epochs:
     type: int
-    lower: 10
-    upper: 50
+    lower: 8
+    upper: 30
     is_fidelity: true
   
   hidden_dim:
@@ -47,6 +47,6 @@ pipeline_space:
 
 
 optimizer: hyperband
-max_evaluations_total: 60
+max_evaluations_total: 50
 
 
