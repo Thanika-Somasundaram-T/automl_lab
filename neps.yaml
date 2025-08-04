@@ -1,7 +1,7 @@
 pipeline_space:
   model:
     type: categorical
-    choices: ["resnet50", "resnext50_32x4d", "efficientnet_v2_s", "swin_tiny"]
+    choices: ["resnet50", "efficientnet_v2_s", "swin_tiny"]
 
 
   lr:
@@ -18,12 +18,10 @@ pipeline_space:
     type: int
     lower: 16
     upper: 50
-    prior: 32
-    prior_confidence: high
 
   max_epochs:
     type: int
-    lower: 5
+    lower: 10
     upper: 50
     is_fidelity: true
   
@@ -31,29 +29,24 @@ pipeline_space:
     type: int
     lower: 128
     upper: 512
-    prior: 256
-    prior_confidence: medium
 
   dropout:
     type: float
     lower: 0.1
     upper: 0.7
-    prior: 0.5
 
   head_layers:
     type: int
     lower: 1
     upper: 3
-    prior: 2
   
   unfreeze_layers:
     type: int
     lower: 0
     upper: 2
-    prior: 2
 
 
-optimizer: priorband
-max_evaluations_total: 100
+optimizer: hyperband
+max_evaluations_total: 60
 
 
