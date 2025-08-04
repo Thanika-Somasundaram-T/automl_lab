@@ -6,9 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 import mup
 from torch.utils.data import DataLoader
-from . import dart
 import numpy as np
 import time
+
+from automl.model import Network
 from . import utils
 from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -83,13 +84,12 @@ def figure_to_tensor(fig):
     return ToTensor()(img)
 
 
-
 def get_optimizer(model, lr_w, lr_alpha, weight_decay_w):
     """
     Separate model parameters into:
       - weight_params: standard network weights (conv, bn, fc)
       - arch_params: architecture parameters (alphas, betas)
-    Returns two optimizers: MuAdam for weights, MuAdam for alphas.
+    Returns two optimizers: Adam for weights, Adam for alphas.
     """
     weight_params = []
     arch_params = []
@@ -98,8 +98,9 @@ def get_optimizer(model, lr_w, lr_alpha, weight_decay_w):
             arch_params.append(param)
         else:
             weight_params.append(param)
-    optimizer_w = mup.MuAdam(weight_params, lr=lr_w, weight_decay=weight_decay_w)
-    optimizer_alpha = mup.MuAdam(arch_params, lr=lr_alpha, weight_decay=0)
+
+    optimizer_w = torch.optim.Adam(weight_params, lr=lr_w, weight_decay=weight_decay_w)
+    optimizer_alpha = torch.optim.Adam(arch_params, lr=lr_alpha, weight_decay=0)
     return optimizer_w, optimizer_alpha
 
 def train_one_epoch(model, optimizer_w, optimizer_alpha, dataloaders, dataset_names, criterion, grad_clip, max_batches_per_dataset=60):
@@ -210,14 +211,14 @@ def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_datas
 
     return avg_loss, avg_acc, all_preds, all_targets
 
-def fit(config, loaders, trial_name, seed=42):
+def fit1(config, loaders, trial_name, seed=42):
     """
     Proxy training function:
       - Trains a smaller PC-DARTS network on a subset of data
       - Optimizes both network weights and architecture params
       - Returns best validation accuracy & model state
     """
-    
+    print("fit 1")
     trial_dir = Path("./tensorboard") / trial_name
     writer = SummaryWriter(log_dir=trial_dir)
     
@@ -246,17 +247,10 @@ def fit(config, loaders, trial_name, seed=42):
     base_width = config.get("base_width", 12)  # smaller width for proxy
     proxy_layers = config.get("layers", 4)    # fewer layers for proxy
 
-    # Build models (base & actual for μP scaling)
-    base_model = dart.DARTSNetwork(
+    model = Network(
         C=base_width, num_classes_dict=num_classes_dict,
         layers=proxy_layers, criterion=criterion
     ).to(device)
-    model = dart.DARTSNetwork(
-        C=base_width, num_classes_dict=num_classes_dict,
-        layers=proxy_layers, criterion=criterion
-    ).to(device)
-    mup.set_base_shapes(model, base_model)
-    del base_model
 
     optimizer_w, optimizer_alpha = get_optimizer(model, lr_w, lr_alpha, weight_decay)
 

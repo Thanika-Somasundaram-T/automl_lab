@@ -1,3 +1,4 @@
+
 import datetime
 import os
 from pathlib import Path
@@ -6,14 +7,11 @@ import torch.nn as nn
 import torch.optim as optim
 import mup
 from torch.utils.data import DataLoader
-from . import dart
 import numpy as np
 import time
-from . import utils
 from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import numpy as np
 import io
@@ -21,8 +19,11 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 import itertools
 
+from automl.model import Network
+from automl.utils import get_device
 
-device = utils.get_device()
+
+device = get_device()
 print("taken device: ", device)
 
 def log_per_class_accuracy(writer, preds, targets, class_names, dataset_name, epoch):
@@ -89,7 +90,7 @@ def get_optimizer(model, lr_w, lr_alpha, weight_decay_w):
     Separate model parameters into:
       - weight_params: standard network weights (conv, bn, fc)
       - arch_params: architecture parameters (alphas, betas)
-    Returns two optimizers: MuAdam for weights, MuAdam for alphas.
+    Returns two optimizers: Adam for weights, Adam for alphas.
     """
     weight_params = []
     arch_params = []
@@ -98,11 +99,12 @@ def get_optimizer(model, lr_w, lr_alpha, weight_decay_w):
             arch_params.append(param)
         else:
             weight_params.append(param)
-    optimizer_w = mup.MuAdam(weight_params, lr=lr_w, weight_decay=weight_decay_w)
-    optimizer_alpha = mup.MuAdam(arch_params, lr=lr_alpha, weight_decay=0)
+
+    optimizer_w = torch.optim.Adam(weight_params, lr=lr_w, weight_decay=weight_decay_w)
+    optimizer_alpha = torch.optim.Adam(arch_params, lr=lr_alpha, weight_decay=0)
     return optimizer_w, optimizer_alpha
 
-def train_one_epoch(model, optimizer_w, optimizer_alpha, dataloaders, dataset_names, criterion, grad_clip, max_batches_per_dataset=60):
+def train_one_epoch(model, optimizer_w, optimizer_alpha, dataloaders, dataset_names, criterion, grad_clip, max_batches_per_dataset=100):
     """
     Train one epoch across all datasets (multitask):
       - Each dataset's batches are interleaved
@@ -164,7 +166,7 @@ def train_one_epoch(model, optimizer_w, optimizer_alpha, dataloaders, dataset_na
     avg_acc = total_correct / total_samples
     return avg_loss, avg_acc
 
-def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_dataset=60):
+def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_dataset=100):
     """
     Evaluate on a subset of validation data for speed.
     """
@@ -210,15 +212,17 @@ def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_datas
 
     return avg_loss, avg_acc, all_preds, all_targets
 
-def fit(config, loaders, trial_name, seed=42):
+def fit2(config, loaders, trial_name, pretrained_path, seed=42):
     """
     Proxy training function:
       - Trains a smaller PC-DARTS network on a subset of data
       - Optimizes both network weights and architecture params
       - Returns best validation accuracy & model state
     """
+    print("fit 2")
     
-    trial_dir = Path("./tensorboard") / trial_name
+    
+    trial_dir = Path("./tensorboard/finetune") / trial_name
     writer = SummaryWriter(log_dir=trial_dir)
     
     train_loaders = [d['train_loader'] for d in loaders]
@@ -247,14 +251,35 @@ def fit(config, loaders, trial_name, seed=42):
     proxy_layers = config.get("layers", 4)    # fewer layers for proxy
 
     # Build models (base & actual for μP scaling)
-    base_model = dart.DARTSNetwork(
+    base_model = Network(
         C=base_width, num_classes_dict=num_classes_dict,
         layers=proxy_layers, criterion=criterion
     ).to(device)
-    model = dart.DARTSNetwork(
+    model = Network(
         C=base_width, num_classes_dict=num_classes_dict,
         layers=proxy_layers, criterion=criterion
     ).to(device)
+    
+    if pretrained_path is not None and pretrained_path.exists():
+        print(f"Loading pretrained weights from {pretrained_path}")
+        checkpoint = torch.load(pretrained_path, map_location=device)
+        if isinstance(checkpoint, dict) and "best_model_state" in checkpoint:
+            state_dict = checkpoint["best_model_state"]
+        else:
+            state_dict = checkpoint
+
+        # Filter out incompatible keys (e.g., classifier heads for other datasets)
+        model_state = model.state_dict()
+        filtered_state = {k: v for k, v in state_dict.items() if k in model_state and v.shape == model_state[k].shape}
+
+        skipped_keys = set(state_dict.keys()) - set(filtered_state.keys())
+        if skipped_keys:
+            print(f"Skipped incompatible keys: {skipped_keys}")
+
+        model_state.update(filtered_state)
+        model.load_state_dict(model_state)
+        print("Pretrained weights loaded successfully.")
+
     mup.set_base_shapes(model, base_model)
     del base_model
 

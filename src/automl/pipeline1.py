@@ -3,20 +3,18 @@ import time
 from pathlib import Path
 
 import torch
-from automl.automl import AutoML
-from automl.train import train_and_validate
 from automl.utils import set_global_seed
-from . import fit
-
-def neps_training_wrapper(loaders, seed, neps_dir=Path):
-    BEST_RESULT_PATH = neps_dir / "neps_best_result.json"
+from automl.fit1 import fit1
+def neps_phase1_wrapper(loaders, seed, neps_dir=Path):
+    
     def evaluate_pipeline(**config):
         
         set_global_seed(seed)
+        trial_name = config.get("_trial_id", f"trial_{int(time.time())}")
 
         start_time = time.time()
            
-        result = fit.fit(config, loaders=loaders, seed=seed)
+        result = fit1(config, loaders=loaders, trial_name=trial_name, seed=seed)
         
         elapsed_time = time.time() - start_time
         
@@ -35,12 +33,12 @@ def neps_training_wrapper(loaders, seed, neps_dir=Path):
 
         # Update best if improved
         if val_acc > best_data.get("val_acc", 0):
+            print("NEW BEST CONFIG FOUND WITH NEW ACC: ", val_acc, "OLD ACC: ", best_data.get("val_acc", 0))
             best_data = {
                 "val_acc": val_acc,
                 "training_time": elapsed_time,
                 "config": config
             }
-            print("NEW BEST CONFIG FOUND WITH NEW ACC: ", val_acc, "OLD ACC: ", best_data.get("val_acc", 0))
             print()
             print(best_data)
             print("*******************************************")
@@ -54,7 +52,7 @@ def neps_training_wrapper(loaders, seed, neps_dir=Path):
                 json.dump(best_data, f, indent=2)
 
         return {
-            "objective_to_minimize": result["val_acc"],
+            "objective_to_minimize": 1.0 - result["val_acc"],
             "cost": elapsed_time,
             "info_dict": {
                 "val_acc": result["val_acc"],

@@ -164,7 +164,12 @@ cython_debug/
 
 data/
 
-neps_results*
-runs/
+neps_results*/
+neps_result*/
+runs*/
 results/
 **/tensor_logs*/
+search_result*/
+finetune_result*/
+tensorboard*/
+dart-real/
