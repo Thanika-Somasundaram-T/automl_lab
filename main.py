@@ -78,25 +78,25 @@ def main(
 ):
     
     p1_dataset = [FlowersDataset, FashionDataset, EmotionsDataset]
-    p2_dataset = [SkinCancerDataset]
+    p2_dataset = [FashionDataset]
     
     
     
     
-    search_datasets = load_data(p1_dataset, seed, 64, 18)
+    # search_datasets = load_data(p1_dataset, seed, 64, 18)
         
-    with open("./phase1_config.yaml", "r") as f:
-        neps_config = yaml.safe_load(f)
+    # with open("./phase1_config.yaml", "r") as f:
+    #     neps_config = yaml.safe_load(f)
         
-    neps_config["evaluate_pipeline"] = neps_phase1_wrapper(search_datasets, seed, neps_dir=search_dir)
+    # neps_config["evaluate_pipeline"] = neps_phase1_wrapper(search_datasets, seed, neps_dir=search_dir)
     
-    run(
-        optimizer=neps_config["optimizer"],
-        max_evaluations_total=neps_config["max_evaluations_total"],
-        root_directory=search_dir,
-        pipeline_space=neps_config["pipeline_space"],
-        evaluate_pipeline=neps_config["evaluate_pipeline"],
-    )
+    # run(
+    #     optimizer=neps_config["optimizer"],
+    #     max_evaluations_total=neps_config["max_evaluations_total"],
+    #     root_directory=search_dir,
+    #     pipeline_space=neps_config["pipeline_space"],
+    #     evaluate_pipeline=neps_config["evaluate_pipeline"],
+    # )
 
     best_config_path = search_dir/"best_config.json"
     with open(best_config_path, "r") as f:
@@ -133,7 +133,7 @@ def main(
     }
     
     finetune_dataset = load_data(p2_dataset, seed, 64, 18)
-    best_config["evaluate_pipeline"] = neps_phase2_wrapper(loaders=finetune_dataset, seed=seed, neps_dir=finetune_dir)
+    best_config["evaluate_pipeline"] = neps_phase2_wrapper(loaders=finetune_dataset, seed=seed, neps_dir=finetune_dir, search_dir=search_dir)
     run(
         optimizer=best_config["optimizer"],
         max_evaluations_total=best_config["max_evaluations_total"],

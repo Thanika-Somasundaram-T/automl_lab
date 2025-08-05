@@ -1,3 +1,3 @@
 optimizer: hyperband
 max_evaluations_total: 10
-max_epochs: 18
+max_epochs: 15

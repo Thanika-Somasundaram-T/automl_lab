@@ -7,7 +7,7 @@ import torch
 from automl.utils import set_global_seed
 from automl.fit2 import fit2
 
-def neps_phase2_wrapper(loaders, seed, neps_dir=Path):
+def neps_phase2_wrapper(loaders, seed, neps_dir=Path, search_dir=Path):
     
     def evaluate_pipeline(**config):
         print("inside neps, ")
@@ -16,7 +16,7 @@ def neps_phase2_wrapper(loaders, seed, neps_dir=Path):
 
         start_time = time.time()
         
-        pretrained_path = Path(neps_dir) / "best_model.pth"
+        pretrained_path = Path(search_dir) / "best_model.pth"
                    
         result = fit2(config, loaders=loaders, trial_name=trial_name, pretrained_path=pretrained_path, seed=seed)
         
