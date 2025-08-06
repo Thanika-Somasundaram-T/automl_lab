@@ -7,7 +7,7 @@ import numpy as np
 from torchvision import transforms
 import yaml
 
-from automl.laod_model import load_model
+from automl.load_model import load_model
 
 
 script_dir = Path(__file__).parent
@@ -18,7 +18,7 @@ import argparse
 import logging
 from torch.utils.tensorboard import SummaryWriter
 
-from automl.utils import calculate_mean_std, get_data_loader, get_device
+from automl.utils import calculate_mean_std, get_data_loader, get_device, transform_images
 from automl.pipeline1 import neps_phase1_wrapper
 from automl.pipeline2 import neps_phase2_wrapper
 from automl.fit3 import fit3
@@ -77,97 +77,113 @@ def main(
     search_dir: Path,
     finetune_dir: Path,
     seed: int,
+    final_dataset,
 ):
+    match final_dataset:
+        case "fashion":
+            dataset_class = FashionDataset
+        case "flowers":
+            dataset_class = FlowersDataset
+        case "emotions":
+            dataset_class = EmotionsDataset
+        case "skin_cancer":
+            dataset_class = SkinCancerDataset
+        case _:
+            raise ValueError(f"Invalid dataset: {args.dataset}")
+    
     
     device = get_device()
-    p1_dataset = [FlowersDataset]
-    p2_dataset = [FashionDataset]
+    p1_dataset = [FlowersDataset, EmotionsDataset, FashionDataset]
+    p2_dataset = [dataset_class]
     
     
     
     
-    # search_datasets = load_data(p1_dataset, seed, 64, 18)
+    search_datasets = load_data(p1_dataset, seed, 64, 18)
         
-    # with open("./phase1_config.yaml", "r") as f:
-    #     neps_config = yaml.safe_load(f)
+    with open("./phase1_config.yaml", "r") as f:
+        neps_config = yaml.safe_load(f)
         
-    # neps_config["evaluate_pipeline"] = neps_phase1_wrapper(search_datasets, seed, neps_dir=search_dir)
+    neps_config["evaluate_pipeline"] = neps_phase1_wrapper(search_datasets, seed, neps_dir=search_dir)
     
-    # run(
-    #     optimizer=neps_config["optimizer"],
-    #     max_evaluations_total=neps_config["max_evaluations_total"],
-    #     root_directory=search_dir,
-    #     pipeline_space=neps_config["pipeline_space"],
-    #     evaluate_pipeline=neps_config["evaluate_pipeline"],
-    # )
+    run(
+        optimizer=neps_config["optimizer"],
+        max_evaluations_total=neps_config["max_evaluations_total"],
+        root_directory=search_dir,
+        pipeline_space=neps_config["pipeline_space"],
+        evaluate_pipeline=neps_config["evaluate_pipeline"],
+    )
 
-    # best_config_path = search_dir/"best_config.json"
-    # with open(best_config_path, "r") as f:
-    #     best_config = json.load(f)
+    best_config_path = search_dir/"best_config.json"
+    with open(best_config_path, "r") as f:
+        best_config = json.load(f)
 
-    # with open("./phase2_config.yaml", "r") as f:
-    #     phase2_config = yaml.safe_load(f)
+    with open("./phase2_config.yaml", "r") as f:
+        phase2_config = yaml.safe_load(f)
 
-    # best_config.update(phase2_config)
-    # print("best_config", best_config)
+    best_config.update(phase2_config)
+    print("best_config", best_config)
 
-    # pipeline_space = {
-    #     "lr_alpha": {
-    #         "lower": best_config["lr_alpha"] * 0.8,
-    #         "upper": best_config["lr_alpha"] * 1.2
-    #     },
-    #     "lr_w": {
-    #         "lower": best_config["lr_w"] * 0.8,
-    #         "upper": best_config["lr_w"] * 1.2
-    #     },
-    #     "grad_clip": {
-    #         "lower": best_config["grad_clip"] * 0.8,
-    #         "upper": best_config["grad_clip"] * 1.2
-    #     },
-    #     "weight_decay": {
-    #         "lower": best_config["weight_decay"] * 0.8,
-    #         "upper": best_config["weight_decay"] * 1.2
-    #     },
-    #     "max_epochs": {
-    #         "lower": best_config["max_epochs"] - 5,
-    #         "upper": best_config["max_epochs"],
-    #         "is_fidelity": True
-    #     }
-    # }
+    pipeline_space = {
+        "lr_alpha": {
+            "lower": best_config["lr_alpha"] * 0.8,
+            "upper": best_config["lr_alpha"] * 1.2
+        },
+        "lr_w": {
+            "lower": best_config["lr_w"] * 0.8,
+            "upper": best_config["lr_w"] * 1.2
+        },
+        "grad_clip": {
+            "lower": best_config["grad_clip"] * 0.8,
+            "upper": best_config["grad_clip"] * 1.2
+        },
+        "weight_decay": {
+            "lower": best_config["weight_decay"] * 0.8,
+            "upper": best_config["weight_decay"] * 1.2
+        },
+        "max_epochs": {
+            "lower": best_config["max_epochs"] - 5,
+            "upper": best_config["max_epochs"],
+            "is_fidelity": True
+        }
+    }
     
-    # finetune_dataset = load_data(p2_dataset, seed, 28, 18)
-    # best_config["evaluate_pipeline"] = neps_phase2_wrapper(loaders=finetune_dataset, seed=seed, neps_dir=finetune_dir, search_dir=search_dir)
-    # run(
-    #     optimizer=best_config["optimizer"],
-    #     max_evaluations_total=best_config["max_evaluations_total"],
-    #     root_directory=finetune_dir,
-    #     pipeline_space=pipeline_space,
-    #     evaluate_pipeline=best_config["evaluate_pipeline"],
-    # )
+    input_size = transform_images(p2_dataset[0])
+    print("input size-------------- ", input_size)
+    finetune_dataset = load_data(p2_dataset, seed, input_size, 18)
+    best_config["evaluate_pipeline"] = neps_phase2_wrapper(loaders=finetune_dataset, seed=seed, neps_dir=finetune_dir, search_dir=search_dir)
+    run(
+        optimizer=best_config["optimizer"],
+        max_evaluations_total=best_config["max_evaluations_total"],
+        root_directory=finetune_dir,
+        pipeline_space=pipeline_space,
+        evaluate_pipeline=best_config["evaluate_pipeline"],
+    )
     
-    # best_config_path = finetune_dir/"best_config.json"
-    # best_model_path = Path(finetune_dir/"best_model.pth")
-    # trial_name = "trial_final"
+    best_config_path = finetune_dir/"best_config.json"
+    best_model_path = Path(finetune_dir/"best_model.pth")
+    trial_name = "trial_final"
     
-    # with open(best_config_path, "r") as f:
-    #     final_best_config = json.load(f)
-    # with open("./phase3_config.yaml", "r") as f:
-    #     phase3_config = yaml.safe_load(f)
+    with open(best_config_path, "r") as f:
+        final_best_config = json.load(f)
+    with open("./phase3_config.yaml", "r") as f:
+        phase3_config = yaml.safe_load(f)
 
-    # final_best_config.update(phase3_config)
+    final_best_config.update(phase3_config)
     
-    final_dataset = load_data(p2_dataset, seed, 20, 20)
-    # results = fit3(config=final_best_config, loaders=final_dataset, best_model_path=best_model_path, trial_name=trial_name, seed=seed)
-    # trained_model = results["model"]
+    final_dataset = load_data(p2_dataset, seed, input_size, 20)
+    results = fit3(config=final_best_config, loaders=final_dataset, best_model_path=best_model_path, trial_name=trial_name, seed=seed)
+    trained_model = results["model"]
     dataset_ = p2_dataset[0]
-    model = load_model(
-    proxy_model_path=Path("./finetune_result_fashion/best_model.pth"),
-    model_path=Path("./saved_models/trial_final_best_model_fashion.pth"),
-    device=device,
-    loaders=final_dataset
-)
+    if trained_model is None:
+        trained_model = load_model(
+            proxy_model_path=Path("./finetune_result_emotions/best_model.pth"),
+            model_path=Path("./saved_models/trial_final_best_model_emotions.pth"),
+            device=device,
+            loaders=final_dataset
+         )
 
-    test_preds, test_labels = predict(model=model, dataset_class=dataset_, device=device, seed=seed)
+    test_preds, test_labels = predict(model=trained_model, dataset_class=dataset_, size=input_size, device=device, seed=seed)
 
     
     # Get predictions from best models
@@ -179,6 +195,7 @@ def main(
     # In case of running on the exam dataset
             
     if p2_dataset[0].__name__ == "SkinCancerDataset":
+        print("inside......")
         test_output_path = Path("data/exam_dataset/predictions.npy")
         test_output_path.parent.mkdir(parents=True, exist_ok=True)
         with test_output_path.open("wb") as f:
@@ -209,7 +226,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=Path("output/predictions.npy"),
+        default=Path("final_test_preds.npy"),
         help=(
             "The path to save the predictions to."
             " By default this will just save to './predictions.npy'."
@@ -255,7 +272,7 @@ if __name__ == "__main__":
             "By default this will save to './neps_results'."
         )
     )
-
+    
     args = parser.parse_args()
 
     if not args.quiet:
@@ -272,5 +289,6 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         search_dir=args.search_dir,
-        finetune_dir=args.finetune_dir
+        finetune_dir=args.finetune_dir,
+        final_dataset=args.dataset
     )

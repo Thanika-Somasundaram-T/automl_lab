@@ -154,7 +154,7 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
     weight_decay = config["weight_decay"]
     grad_clip = config["grad_clip"]
     max_epochs = config["max_epochs"]
-    patience = config.get("early_stopping_patience", 100)
+    patience = config.get("early_stopping_patience", 10)
 
     criterion = nn.CrossEntropyLoss()
     best_val_acc = 0.0
@@ -211,7 +211,7 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_model_state = fixed_model.state_dict()
-            epochs_no_improve = 0  # reset patience counter
+            epochs_no_improve = 0
             for dataset_name in dataset_names:
                 num_cls = num_classes_dict[dataset_name]
                 class_names = [str(i) for i in range(num_cls)]
@@ -237,7 +237,6 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
     
     if best_model_state is not None:
         fixed_model.load_state_dict(best_model_state)
-        # Save the best model after training finishes
         save_path = Path("./saved_models") / f"{trial_name}_best_model.pth"
         save_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(best_model_state, save_path)
@@ -245,33 +244,6 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
 
     return {
         "val_acc": best_val_acc,
-        "model": fixed_model,    # <-- return the trained model object here
+        "model": fixed_model,
         "best_config": config
     }
-
-
-def predict(self, dataset_class) -> Tuple[np.ndarray, np.ndarray]:
-    # Prepare data loader for test split
-    data_loader, _ = get_data_loader(
-        dataset_class=dataset_class,
-        test_transform=self._transform,
-        batch_size=100,
-        split="test",
-        seed=self.seed
-    )
-
-    predictions = []
-    labels = []
-
-    self._model.eval()
-    with torch.no_grad():
-        for data, target in tqdm(data_loader, desc="Predicting", leave=False):
-            data = data.to(self.device)
-            output = self._model(data)
-            predicted = torch.argmax(output, dim=1)
-            labels.append(target.cpu().numpy())
-            predictions.append(predicted.cpu().numpy())
-
-    predictions = np.concatenate(predictions)
-    labels = np.concatenate(labels)
-    return predictions, labels

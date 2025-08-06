@@ -40,7 +40,7 @@ def load_model(proxy_model_path: Path, model_path: Path, device, loaders):
     fixed_model = NetworkFixed(
         C=32,
         num_classes_dict=num_classes_dict,
-        layers=10,
+        layers=15,
         genotype=genotype,
     ).to(device)
 

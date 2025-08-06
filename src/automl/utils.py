@@ -21,11 +21,11 @@ def transform_images(dataset_class):
     elif "emotions" in name:
         return 48
     elif "flowers" in name:
-        return 224
+        return 96
     elif "skin_cancer" in name:
-        return 224
+        return 72
     else:
-        return 128
+        return 64
     
 def get_device():
     if torch.backends.mps.is_available() and torch.backends.mps.is_built():

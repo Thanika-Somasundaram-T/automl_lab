@@ -6,7 +6,7 @@ from torchvision import transforms
 
 from automl.utils import calculate_mean_std, get_data_loader
 
-def predict(model: torch.nn.Module, dataset_class, device, seed) -> Tuple[np.ndarray, np.ndarray]:
+def predict(model: torch.nn.Module, dataset_class, size, device, seed) -> Tuple[np.ndarray, np.ndarray]:
     """
     Predict on the test split of the dataset_class using the given model.
     """
@@ -14,6 +14,7 @@ def predict(model: torch.nn.Module, dataset_class, device, seed) -> Tuple[np.nda
     transform = transforms.Compose(
             [
                 transforms.Grayscale(num_output_channels=3),
+                transforms.Resize(size),
                 transforms.ToTensor(),
                 transforms.Normalize(*calculate_mean_std(dataset_class)),
             ]

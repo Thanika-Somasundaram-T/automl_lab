@@ -85,12 +85,6 @@ def figure_to_tensor(fig):
 
 
 def get_optimizer(model, lr_w, lr_alpha, weight_decay_w):
-    """
-    Separate model parameters into:
-      - weight_params: standard network weights (conv, bn, fc)
-      - arch_params: architecture parameters (alphas, betas)
-    Returns two optimizers: Adam for weights, Adam for alphas.
-    """
     weight_params = []
     arch_params = []
     for name, param in model.named_parameters():
@@ -212,12 +206,6 @@ def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_datas
     return avg_loss, avg_acc, all_preds, all_targets
 
 def fit2(config, loaders, trial_name, pretrained_path, seed=42):
-    """
-    Proxy training function:
-      - Trains a smaller PC-DARTS network on a subset of data
-      - Optimizes both network weights and architecture params
-      - Returns best validation accuracy & model state
-    """
     print("fit 2")
     
     

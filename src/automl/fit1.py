@@ -116,7 +116,7 @@ def train_one_epoch(model, optimizer_w, optimizer_alpha, dataloaders, dataset_na
     all_batches = []
     for i, dl in enumerate(dataloaders):
         for j, batch in enumerate(dl):
-            if j >= max_batches_per_dataset:  # limit for proxy mode
+            if j >= max_batches_per_dataset:
                 break
             all_batches.append((i, batch))
 
@@ -178,7 +178,7 @@ def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_datas
     all_batches = []
     for i, dl in enumerate(dataloaders):
         for j, batch in enumerate(dl):
-            if j >= max_batches_per_dataset:  # proxy mode eval
+            if j >= max_batches_per_dataset:
                 break
             all_batches.append((i, batch))
 
@@ -212,12 +212,6 @@ def evaluate(model, dataloaders, dataset_names, criterion, max_batches_per_datas
     return avg_loss, avg_acc, all_preds, all_targets
 
 def fit1(config, loaders, trial_name, seed=42):
-    """
-    Proxy training function:
-      - Trains a smaller PC-DARTS network on a subset of data
-      - Optimizes both network weights and architecture params
-      - Returns best validation accuracy & model state
-    """
     print("fit 1")
     trial_dir = Path("./tensorboard") / trial_name
     writer = SummaryWriter(log_dir=trial_dir)
@@ -244,8 +238,8 @@ def fit1(config, loaders, trial_name, seed=42):
     best_model_state = None
     best_config = None
 
-    base_width = config.get("base_width", 12)  # smaller width for proxy
-    proxy_layers = config.get("layers", 4)    # fewer layers for proxy
+    base_width = config.get("base_width", 12)
+    proxy_layers = config.get("layers", 4)
 
     model = Network(
         C=base_width, num_classes_dict=num_classes_dict,
