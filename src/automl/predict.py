@@ -22,7 +22,7 @@ def predict(model: torch.nn.Module, dataset_class, device, seed) -> Tuple[np.nda
     data_loader, _ = get_data_loader(
         dataset_class=dataset_class,
         test_transform=transform,
-        batch_size=100,
+        batch_size=1,
         split="test",
         seed=seed
     )

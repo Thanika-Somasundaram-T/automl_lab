@@ -24,8 +24,8 @@ pipeline_space:
 
   max_epochs:
     type: int
-    lower: 4
-    upper: 10
+    lower: 2
+    upper: 15
     is_fidelity: true
 
 optimizer: hyperband

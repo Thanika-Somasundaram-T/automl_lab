@@ -154,7 +154,7 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
     weight_decay = config["weight_decay"]
     grad_clip = config["grad_clip"]
     max_epochs = config["max_epochs"]
-    patience = config.get("early_stopping_patience", 5)
+    patience = config.get("early_stopping_patience", 100)
 
     criterion = nn.CrossEntropyLoss()
     best_val_acc = 0.0
@@ -184,7 +184,7 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
     fixed_model = NetworkFixed(
         C=config.get("final_width", 32),
         num_classes_dict=num_classes_dict,
-        layers=config.get("final_layers", 10),
+        layers=config.get("final_layers", 15),
         genotype=genotype,
     ).to(device)
 
@@ -207,7 +207,7 @@ def fit3(config, loaders, best_model_path, trial_name, seed=42):
         writer.add_scalar("Accuracy/val", val_acc, epoch)
         writer.add_scalar("LearningRate/weights", lr_w, epoch)
 
-                # Track best
+         # Track best
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_model_state = fixed_model.state_dict()
